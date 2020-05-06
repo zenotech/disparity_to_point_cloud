@@ -44,25 +44,13 @@
 namespace d2pc {
 
 void Disparity2PCloud::DisparityCb(const sensor_msgs::ImageConstPtr &msg) {
-  printf("start \n");
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-  printf("new point cloud \n");
-  cv_bridge::CvImagePtr disparity = cv_bridge::toCvCopy(*msg, "mono8");
-  printf("toCvCopy \n");
+  cv_bridge::CvImageConstPtr disparity = cv_bridge::toCvShare(msg);
   cv::Size s = disparity->image.size();
   cv::Vec3f *pv;
 
-  cv::Mat median_filtered(s, CV_8U);
-  // cv::Mat median_filtered = disparity->image;
-  cv::medianBlur(disparity->image, median_filtered, 11);
-  printf("medianBlur \n");
-
-  cv::Mat real_disparity(s, CV_32FC1);
-  median_filtered.convertTo(real_disparity, CV_32FC1, 1.0 / 8.0);
-
   cv::Mat image3D(s, CV_32FC3);
-  cv::reprojectImageTo3D(real_disparity, image3D, Q_);
-  printf("reprojectImageTo3D \n");
+  cv::reprojectImageTo3D(disparity->image, image3D, Q_);
 
   // cv::Mat medianFilterd = disparity->image;
 
@@ -74,21 +62,19 @@ void Disparity2PCloud::DisparityCb(const sensor_msgs::ImageConstPtr &msg) {
       cloud->points.push_back(pcl::PointXYZ(value[0], value[1], value[2]));
     }
   }
-  printf("cloud push_back \n");
 
   cloud->width = cloud->points.size();
   cloud->height = 1;
   cloud->is_dense = false;
-  printf("Cloud size: %d\n", cloud->points.size());
+  //printf("Cloud size: %lu\n", cloud->points.size());
   // send point cloud
   sensor_msgs::PointCloud2 output;
   pcl::toROSMsg(*cloud, output);
   // does not work on the rosbag with the tf broadcaster for the camera position
   output.header.stamp = disparity->header.stamp;
   // TODO: create ros param for this
-  output.header.frame_id = "/camera_optical_frame";
+  output.header.frame_id = "/front_optical";
   p_cloud_pub_.publish(output);
-  printf("publish\n");
 }
 
 } /* d2pc */
